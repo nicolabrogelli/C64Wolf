@@ -1,0 +1,909 @@
+00001  0000             SCREENMEM  = $0400 ; START OF SCREEN MEMORY
+00002  0001             COLORMEM   = $D800 ; START OF COLOR MEMORY
+00003  0001             
+00004  0001             ; COSTANTI PER I COLORITEMP
+00005  0001             BLACK      = #$00
+00006  0001             WHITE      = #$01
+00007  0001             GREEN      = #$05
+00008  0001             YELLOW     = #$07
+00009  0001             ORANGE     = #$12
+00010  0001             LIGHT_GREEN = #$13
+00011  0001             
+00012  0001             
+00013  0001             ; COSTSNTI MOVIMENTI JOY_PORT_A
+00014  0001             UP         = #$01
+00015  0001             DOWN       = #$02
+00016  0001             LEFT       = #$04
+00017  0001             RIGHT      = #$08
+00018  0001             
+00019  0001             ; COSTANTI GENERICHE
+00020  0001             DISABLE_ALL_SPRITE = #$0
+00021  0001             ENABLE_ALL_SPRITE = #$FF
+00022  0001             
+00023  0001             
+00024  0001             ; REGISTRI DEL VIC
+00025  0001             VIC_SPRITE_POSX_REGISTER = $D000
+00026  0001             VIC_SPRITE_POSY_REGISTER = $D001
+00027  0001             VIC_SPRITE_POSX_EXTENDED_REGISTER = $D010
+00028  0001             VIC_RASTER_REGISTER = $D012
+00029  0001             VIC_SPRITE_ENABLE_REGISTER = $D015
+00030  0001             VIC_INTERRUPT_REGISTER = $D01A
+00031  0001             VIC_SPRITE_ENABLE_MULTICOLOR = $D01C
+00032  0001             SPSPCL     = $D01E
+00033  0001             VIC_BORDER_REGISTER = $D020
+00034  0001             VIC_BACKGROUND_REGISTER = $D021
+00035  0001             VIC_SPRITE_MULTICOLOR_0 = $D025
+00036  0001             VIC_SPRITE_MULTICOLOR_1 = $D026
+00037  0001             VIC_SPRITE_0_COLOR = $D027
+00038  0001             VIC_SPRITE_1_COLOR = $D028
+00039  0001             VIC_SPRITE_0_POINTER = $7F8
+00040  0001             VIC_SPRITE_COLLISION_FOREGROUND = $D01F
+00041  0001                        
+00042  0001             
+00043  0001             GETIN      =  $FFE4
+00044  0001             SCNKEY     =  $FF9F
+00045  0001             JOY_PORT_A = $DC00
+00046  0001             
+00047  0001             ; **************************************************************************
+00048  0001             ; *   AGGIUNTA UNA MINIMA GESTIONE DEL PUNTEGGIO                           *
+00049  0001             ; *   STABILIZZAZIONE DEL GIOCO                                            *
+00050  0001             ; **************************************************************************
+00051  0001             
+00052  0001             
+00053  0001             
+00054  0001             
+00055  0001             
+00056  0001             
+00057  0001             *=$0801    ; 10 SYS (2064)
+00058  0801             
+00059  0801  0E 08 0A              BYTE $0E, $08, $0A, $00, $9E, $20, $28, $32
+00060  0809  30 36 34              BYTE $30, $36, $34, $29, $00, $00, $00
+00061  0810             
+00062  0810             
+00063  0810             
+00064  0810  20 2E 0A              JSR CLEARSCREEN                         ; ESEGUE LA CANCELLAZIONE DELLO SCHERMO
+00065  0813  20 1E 0A              JSR SETUPCOLORSPRITE0                   ; DEFINISCE I COLORI PER LO SPRITE 0 (WOLF)
+00066  0816  20 EE 09              JSR ENABLEMULTICOLOR                    ; ABILITA IL MULTICOLOR PER GLI SPRITE
+00067  0819  20 FF 09              JSR ENABLESPRITE                        ; ABILITA GLI SPRITE
+00068  081C  20 E8 09              JSR SETPOINTERDATASPRITES               ;
+00069  081F  20 DD 09              JSR SETDEFAULTPOSITIONSPRITE            ; SETTA LA POSIZIONE DI DEFAULT DELLO SPRITE 0
+00070  0822  20 D7 09              JSR SETPLAYINGFIELD                     ; SETTA I COLORI DEL CAMPO DI GIOCO
+00071  0825  20 08 09              JSR DRAWTEXT                            ; SCRIVE IL TESTO
+00072  0828  20 1B 09              JSR MAKEMAP                             ; DISEGNA LA MAPPA SULLO SCHERMO
+00073  082B             
+00074  082B             
+00075  082B             
+00076  082B             
+00077  082B             
+00078  082B  78                    SEI
+00079  082C             LOOP       
+00080  082C             
+00081  082C  20 3A 0A              JSR PLAYERCONTROL                       ; GESTIONE DEI MOVIMENTI DEL JOY PER LOOP
+00082  082F                        ; SPRITE 0 (WOLF).
+00083  082F             
+00084  082F                        
+00085  082F  20 61 08              JSR CHECKPLAYERCOLLISON                 ; VERIFICA SE SI PRESENTA UNA COLLISIONE
+00086  0832                        ; TRA LO SPRITE 0 (WOLF) E UNO DELGLI
+00087  0832                        ; ALTRI SPRITE.
+00088  0832             
+00089  0832             
+00090  0832  20 B8 09              JSR CHECKSPRITECOLLIDECHAR
+00091  0835             
+00092  0835  20 32 0A              JSR WAITRASTER                          ; ATTENDE L'ARRIVO DELLA RASTER PRIMA DI
+00093  0838                        ; CONTINUARE IL LOOP DEL GIOCO.
+00094  0838             
+00095  0838             
+00096  0838  AD 35 0B              LDA REFRESH_BALLONS
+00097  083B  C9 FF                 CMP #$FF
+00098  083D  D0 0D                 BNE CONTINUE
+00099  083F             
+00100  083F  A9 1F                 LDA #%00011111
+00101  0841  8D 15 D0              STA VIC_SPRITE_ENABLE_REGISTER
+00102  0844             
+00103  0844  20 C5 08              JSR BALLON
+00104  0847  A9 00                 LDA #$0
+00105  0849  8D 35 0B              STA REFRESH_BALLONS
+00106  084C             
+00107  084C             CONTINUE
+00108  084C  EE 35 0B              INC REFRESH_BALLONS
+00109  084F             
+00110  084F             
+00111  084F                        
+00112  084F  AD 34 0B              LDA SCORE
+00113  0852  C9 3A                 CMP #58
+00114  0854  D0 05                 BNE NORESETSCORE
+00115  0856  A9 30                 LDA #48
+00116  0858  8D 34 0B              STA SCORE
+00117  085B             
+00118  085B             NORESETSCORE 
+00119  085B  8D 20 04              STA $420                                ; SCRIVE IL PUNTEGGIO A VIDEO
+00120  085E             
+00121  085E             
+00122  085E  4C 2C 08              JMP LOOP
+00123  0861             
+00124  0861             
+00125  0861             ;===============================================================================
+00126  0861             CHECKPLAYERCOLLISON 
+00127  0861             
+00128  0861  AD 1E D0              LDA $D01E
+00129  0864             
+00130  0864  C9 03                 CMP #3                                  ; 00000011
+00131  0866  D0 1A                 BNE NOCOLLIDESPRITE1_2
+00132  0868             
+00133  0868  A9 86                 LDA #$86
+00134  086A  8D F9 07              STA $07F9
+00135  086D             
+00136  086D  AD 15 D0              LDA VIC_SPRITE_ENABLE_REGISTER
+00137  0870  29 FD                 AND #%11111101
+00138  0872  8D 15 D0              STA VIC_SPRITE_ENABLE_REGISTER
+00139  0875             
+00140  0875  AD 34 0B              LDA SCORE                               ; VERIFICA CHE LO SCORE NON
+00141  0878  C9 30                 CMP #48                                 ; ASSUMA MAI VOLORI INFERIORI
+00142  087A  F0 06                 BEQ NOCOLLIDESPRITE1_2                  ; ALLO 0 (48)
+00143  087C  CE 34 0B              DEC SCORE
+00144  087F                        
+00145  087F  4C C4 08              JMP EXITCOLLIDE
+00146  0882             
+00147  0882             NOCOLLIDESPRITE1_2 
+00148  0882  C9 05                 CMP #5                                  ; 00000101
+00149  0884  D0 13                 BNE NOCOLLIDESPRITE3_1
+00150  0886             
+00151  0886  A9 86                 LDA #$86
+00152  0888  8D FA 07              STA $07FA
+00153  088B             
+00154  088B  AD 15 D0              LDA VIC_SPRITE_ENABLE_REGISTER
+00155  088E  29 FB                 AND #%11111011
+00156  0890  8D 15 D0              STA VIC_SPRITE_ENABLE_REGISTER
+00157  0893             
+00158  0893  EE 34 0B              INC SCORE                               ; INCREMENTA LO SCORE
+00159  0896                        
+00160  0896  4C C4 08              JMP EXITCOLLIDE
+00161  0899             
+00162  0899             NOCOLLIDESPRITE3_1 
+00163  0899  C9 09                 CMP #09                                 ; 0001001
+00164  089B  D0 13                 BNE NOCOLLIDESPRITE4_1
+00165  089D             
+00166  089D                        
+00167  089D  A9 86                 LDA #$86
+00168  089F  8D FB 07              STA $07FB
+00169  08A2             
+00170  08A2  AD 15 D0              LDA VIC_SPRITE_ENABLE_REGISTER
+00171  08A5  29 F7                 AND #%11110111
+00172  08A7  8D 15 D0              STA VIC_SPRITE_ENABLE_REGISTER
+00173  08AA             
+00174  08AA  EE 34 0B              INC SCORE                               ; INCREMENTA LO SCORE
+00175  08AD             
+00176  08AD  4C C4 08              JMP EXITCOLLIDE
+00177  08B0             
+00178  08B0             NOCOLLIDESPRITE4_1 
+00179  08B0             
+00180  08B0  C9 11                 CMP #17                                 ; 00010001
+00181  08B2  D0 10                 BNE NOCOLLIDESPRITE5_1
+00182  08B4             
+00183  08B4  A9 86                 LDA #$86
+00184  08B6  8D FC 07              STA $07FC
+00185  08B9             
+00186  08B9  AD 15 D0              LDA VIC_SPRITE_ENABLE_REGISTER
+00187  08BC  29 EF                 AND #%11101111
+00188  08BE  8D 15 D0              STA VIC_SPRITE_ENABLE_REGISTER
+00189  08C1             
+00190  08C1  EE 34 0B              INC SCORE                               ; INCREMENTA LO SCORE
+00191  08C4             
+00192  08C4             NOCOLLIDESPRITE5_1 
+00193  08C4             
+00194  08C4             EXITCOLLIDE 
+00195  08C4             
+00196  08C4                        
+00197  08C4                        
+00198  08C4  60                    RTS
+00199  08C5             
+00200  08C5             
+00201  08C5             ;===============================================================================
+00202  08C5             BALLON
+00203  08C5             
+00204  08C5  AE 36 0B              LDX TEMP
+00205  08C8  E0 09                 CPX #9
+00206  08CA  D0 05                 BNE BALLONCONTINUE
+00207  08CC                        
+00208  08CC  A2 00                 LDX #0
+00209  08CE  8E 36 0B              STX TEMP
+00210  08D1             
+00211  08D1             BALLONCONTINUE 
+00212  08D1                        
+00213  08D1             
+00214  08D1                        ; PROVA POSIZIONAMENTO SECONDO SPRITE
+00215  08D1  BD 56 0B              LDA SPRITE2_BALLONS_POSX,X
+00216  08D4  8D 02 D0              STA $D002
+00217  08D7  BD 5F 0B              LDA SPRITE2_BALLONS_POSY,X
+00218  08DA  8D 03 D0              STA $D003
+00219  08DD  A9 89                 LDA #$89        ; PALLONCINO MARRONE
+00220  08DF  8D F9 07              STA $07F9
+00221  08E2             
+00222  08E2                        ; PROVA POSIZIONAMENTO TERZO SPRITE
+00223  08E2             
+00224  08E2  BD 68 0B              LDA SPRITE3_BALLONS_POSX,X
+00225  08E5  8D 04 D0              STA $D004
+00226  08E8  BD 71 0B              LDA SPRITE3_BALLONS_POSY,X
+00227  08EB  8D 05 D0              STA $D005
+00228  08EE  A9 89                 LDA #$89        ; PALLONCINO MARRONE
+00229  08F0  8D FA 07              STA $07FA
+00230  08F3             
+00231  08F3             
+00232  08F3  BD 83 0B              LDA SPRITE4_BALLONS_POSY,X
+00233  08F6  8D 06 D0              STA $D006
+00234  08F9  BD 83 0B              LDA SPRITE4_BALLONS_POSY,X
+00235  08FC  8D 07 D0              STA $D007
+00236  08FF  A9 89                 LDA #$89        ; PALLONCINO MARRONE
+00237  0901  8D FB 07              STA $07FB
+00238  0904             
+00239  0904             
+00240  0904  EE 36 0B              INC TEMP
+00241  0907             
+00242  0907  60                    RTS
+00243  0908             
+00244  0908             
+00245  0908             ;===============================================================
+00246  0908             ; SCRIVE UN MESSAGGIO A VIDEO
+00247  0908             DRAWTEXT
+00248  0908  A2 00                 LDX #$00                        ; PUNTATORE AL CARATTERE DA LEGGERE
+00249  090A             
+00250  090A             LOOPTEXT   
+00251  090A  BD 94 0B              LDA PUNTEGGIO,X                    ; PRENDE IL CARATTERE PUNTATO DALLA
+00252  090D                        ; DALLA STRINGA DI TESTO
+00253  090D  C9 00                 CMP #$0                         ; CONTROLLA CHE IL BYTE LETTO SIA IL
+00254  090F  F0 09                 BEQ DONE                        ; TERMONATORE DI STRINGA
+00255  0911                        
+00256  0911             
+00257  0911             OUTCHAR
+00258  0911  29 3F                 AND #$3F                        ; CORRECTION BECAUSE FOR POKE A IS 1 AND NOT 65.
+00259  0913  9D 00 04              STA SCREENMEM,X                   ; STORE CHARACTER DIRECTLY IN SCREEN MEMORY
+00260  0916             
+00261  0916  E8                    INX                             ; AGGIORNA IL PUNTATORE AL CARATTER
+00262  0917             
+00263  0917             CONTINUETEXT ; KEEP GOING UNTIL WE HAVE PROCESSED THE ENTIRE STRING
+00264  0917  B8                    CLV
+00265  0918  50 F0                 BVC LOOPTEXT                    ; BRANCH ALWAYS – TWO OPCODE RELOCATABLE VERSION OF JMP
+00266  091A             
+00267  091A             DONE       
+00268  091A  60                    RTS
+00269  091B             
+00270  091B             ;===============================================================================
+00271  091B             ; IL SISTEMA VA RIVISTO MAGARI IMPORTANDO DIRETTAMENTE LA MAPPA
+00272  091B             MAKEMAP
+00273  091B  A2 00                 LDX #$00
+00274  091D             
+00275  091D  A9 66      DRAW1      LDA #102
+00276  091F  9D 28 04              STA $0428,X    ; DISEGNA LA RIGA SUPERIORE
+00277  0922  9D C0 07              STA $07C0,X    ; DISEGNA LA RIGA INFERIORE
+00278  0925  8D 50 04              STA $0450
+00279  0928  8D 77 04              STA $0477
+00280  092B  8D 78 04              STA $0478
+00281  092E  8D 9F 04              STA $049F
+00282  0931  8D A0 04              STA $04A0
+00283  0934  8D C7 04              STA $04C7
+00284  0937  8D C8 04              STA $04C8
+00285  093A  8D EF 04              STA $04EF
+00286  093D  8D F0 04              STA $04F0
+00287  0940  8D 17 05              STA $0517
+00288  0943  8D 18 05              STA $0518
+00289  0946  8D 3F 05              STA $053F
+00290  0949  8D 40 05              STA $0540
+00291  094C  8D 67 05              STA $0567
+00292  094F  8D 68 05              STA $0568
+00293  0952  8D 8F 05              STA $058F
+00294  0955  8D 90 05              STA $0590
+00295  0958  8D B7 05              STA $05B7
+00296  095B  8D B8 05              STA $05B8
+00297  095E  8D DF 05              STA $05DF
+00298  0961  8D E0 05              STA $05E0
+00299  0964             
+00300  0964  E8                    INX
+00301  0965  E0 28                 CPX #$28 ;(OR USE #40 INSTEAD)
+00302  0967  D0 B4                 BNE DRAW1
+00303  0969             
+00304  0969  A2 00                 LDX #$00
+00305  096B             
+00306  096B  A9 66      DRAW2      LDA #102
+00307  096D  8D 07 06              STA $0607
+00308  0970  8D 08 06              STA $0608
+00309  0973  8D 2F 06              STA $062F
+00310  0976  8D 30 06              STA $0630
+00311  0979  8D 57 06              STA $0657
+00312  097C  8D 58 06              STA $0658
+00313  097F  8D 7F 06              STA $067F
+00314  0982  8D 80 06              STA $0680
+00315  0985  8D A7 06              STA $06A7
+00316  0988  8D A8 06              STA $06A8
+00317  098B  8D CF 06              STA $06CF
+00318  098E  8D D0 06              STA $06D0
+00319  0991  8D F7 06              STA $06F7
+00320  0994  8D F8 06              STA $06F8
+00321  0997  8D 1F 07              STA $071F
+00322  099A  8D 20 07              STA $0720
+00323  099D  8D 47 07              STA $0747
+00324  09A0  8D 48 07              STA $0748
+00325  09A3  8D 6F 07              STA $076F
+00326  09A6  8D 70 07              STA $0770
+00327  09A9  8D 97 07              STA $0797
+00328  09AC  8D 98 07              STA $0798
+00329  09AF  8D BF 07              STA $07BF
+00330  09B2             
+00331  09B2  E8                    INX
+00332  09B3  E0 28                 CPX #$28 ;(OR USE #40 INSTEAD)
+00333  09B5  D0 B4                 BNE DRAW2
+00334  09B7                        
+00335  09B7                        
+00336  09B7             
+00337  09B7                        
+00338  09B7  60                    RTS
+00339  09B8             
+00340  09B8             ;===============================================================================
+00341  09B8             ; CONTROLLA SE LO SPRITE È IN COLLISIONE CON IL CARATTERE
+00342  09B8             CHECKSPRITECOLLIDECHAR 
+00343  09B8             
+00344  09B8  AE 1F D0              LDX VIC_SPRITE_COLLISION_FOREGROUND
+00345  09BB  E0 01                 CPX #$1
+00346  09BD  F0 01                 BEQ COLLISIONWITHCHAR
+00347  09BF                        ; NON SI È VERIFICATA NESSUNA COLLISIONE
+00348  09BF  60                    RTS
+00349  09C0             
+00350  09C0             COLLISIONWITHCHAR 
+00351  09C0             
+00352  09C0             
+00353  09C0                        ; UNA VOLTA IDENTIFICATA LA COLLISIONE POSIZIONA LA VOLPE
+00354  09C0  A9 96                 LDA #150
+00355  09C2  8D 00 D0              STA VIC_SPRITE_POSX_REGISTER
+00356  09C5  8D 01 D0              STA VIC_SPRITE_POSY_REGISTER
+00357  09C8  8D 37 0B              STA SPRITE_POS_X
+00358  09CB  8D 3F 0B              STA SPRITE_POS_Y
+00359  09CE             
+00360  09CE  A9 00                 LDA #0
+00361  09D0  8D 10 D0              STA VIC_SPRITE_POSX_EXTENDED_REGISTER
+00362  09D3  8D 4F 0B              STA SPRITE_POS_X_EXTEND
+00363  09D6             
+00364  09D6             
+00365  09D6  60                    RTS
+00366  09D7             
+00367  09D7             ;===============================================================================
+00368  09D7             ;
+00369  09D7             SETPLAYINGFIELD 
+00370  09D7  A9 12                 LDA ORANGE                              ; COLORA IL BORDO DELLO SCHERMO
+00371  09D9  8D 20 D0              STA VIC_BORDER_REGISTER
+00372  09DC             ;        LDA WHITE
+00373  09DC             ;        STA VIC_BACKGROUND_REGISTER
+00374  09DC             
+00375  09DC  60                    RTS
+00376  09DD             
+00377  09DD             ;===============================================================================
+00378  09DD             ; SETTA LA POSIZIONE DI DEFAULT DELLO SPRITE 0, QUESTA VA RIVISTA!!!
+00379  09DD             SETDEFAULTPOSITIONSPRITE 
+00380  09DD  A9 1E                 LDA #30
+00381  09DF  8D 00 D0              STA VIC_SPRITE_POSX_REGISTER
+00382  09E2  A9 96                 LDA #150
+00383  09E4  8D 01 D0              STA VIC_SPRITE_POSY_REGISTER
+00384  09E7             
+00385  09E7  60                    RTS
+00386  09E8             
+00387  09E8             ;===============================================================================
+00388  09E8             ; SETTA IL PUNTATORE ALLA FIÌGURA PER LO SPRITE 0
+00389  09E8             SETPOINTERDATASPRITES 
+00390  09E8  A9 80                 LDA #$80
+00391  09EA  8D F8 07              STA VIC_SPRITE_0_POINTER        ; PUNTATORE AL BLOCCO DATI CHE CONTIENE LA FIGURA
+00392  09ED                        ; PER LO SPRITE 0
+00393  09ED  60                    RTS
+00394  09EE             
+00395  09EE             ;===============================================================================
+00396  09EE             ; ABILITA LA MODALITÀ MULTICOLOR PER GLI SPRITE.
+00397  09EE             
+00398  09EE             ENABLEMULTICOLOR 
+00399  09EE             
+00400  09EE  A2 00                 LDX #$0
+00401  09F0             LOOPENABLEMULTICOLOR 
+00402  09F0  BD 8C 0B              LDA SPRITENUMBERMASK,X
+00403  09F3  0D 1C D0              ORA VIC_SPRITE_ENABLE_MULTICOLOR
+00404  09F6  8D 1C D0              STA VIC_SPRITE_ENABLE_MULTICOLOR
+00405  09F9  E8                    INX
+00406  09FA  E0 04                 CPX #$4
+00407  09FC  D0 F2                 BNE LOOPENABLEMULTICOLOR
+00408  09FE             
+00409  09FE  60                    RTS
+00410  09FF             
+00411  09FF             
+00412  09FF             ;===============================================================================
+00413  09FF             ; ABILITA GLI SPRITE.
+00414  09FF             
+00415  09FF             ENABLESPRITE 
+00416  09FF             
+00417  09FF  A2 00                 LDX #$0
+00418  0A01             LOOPENABLESPRITE 
+00419  0A01  BD 8C 0B              LDA SPRITENUMBERMASK,X
+00420  0A04  0D 15 D0              ORA VIC_SPRITE_ENABLE_REGISTER
+00421  0A07  8D 15 D0              STA VIC_SPRITE_ENABLE_REGISTER
+00422  0A0A  E8                    INX
+00423  0A0B  E0 04                 CPX #$4
+00424  0A0D  D0 F2                 BNE LOOPENABLESPRITE
+00425  0A0F                        
+00426  0A0F  60                    RTS
+00427  0A10             
+00428  0A10             
+00429  0A10             ;===============================================================================
+00430  0A10             ; POSIZIONA LO SPRITE 0 (WOLF) IN UN PUNTO DEFINITO DELLO SCHERMO
+00431  0A10             
+00432  0A10             BASEPOSITIONSPRITE 
+00433  0A10  A2 00                 LDX #$0
+00434  0A12  BD 37 0B              LDA SPRITE_POS_X,X
+00435  0A15  8D 00 D0              STA VIC_SPRITE_POSX_REGISTER
+00436  0A18  A9 00                 LDA #$0
+00437  0A1A  8D 01 D0              STA VIC_SPRITE_POSY_REGISTER
+00438  0A1D             
+00439  0A1D  60                    RTS
+00440  0A1E             
+00441  0A1E             
+00442  0A1E             ;===============================================================================
+00443  0A1E             ; DEFINISCE I COLORI PER LO SPRITE 0 IN MODALITÀ MULTICOLR
+00444  0A1E             SETUPCOLORSPRITE0 
+00445  0A1E             
+00446  0A1E  A9 12                 LDA ORANGE
+00447  0A20  8D 27 D0              STA VIC_SPRITE_0_COLOR
+00448  0A23  A9 00                 LDA BLACK
+00449  0A25  8D 25 D0              STA VIC_SPRITE_MULTICOLOR_0
+00450  0A28  A9 01                 LDA WHITE
+00451  0A2A  8D 26 D0              STA VIC_SPRITE_MULTICOLOR_1
+00452  0A2D  60                    RTS
+00453  0A2E             
+00454  0A2E             
+00455  0A2E             ;===============================================================================
+00456  0A2E             ; ESEGUE LA CANCELLAZIONE DELLO SCHERMO RICHIAMANDO LA ROUTNE ALL'INDIRIZZO $E544
+00457  0A2E             CLEARSCREEN 
+00458  0A2E  20 44 E5              JSR $E544
+00459  0A31  60                    RTS
+00460  0A32             
+00461  0A32             
+00462  0A32             
+00463  0A32             ;===============================================================================
+00464  0A32             ; ATTENDE L'ARRIVO DELLA RASTERLINE
+00465  0A32             
+00466  0A32             WAITRASTER 
+00467  0A32  A9 FF                 LDA #255
+00468  0A34             WAITLOOP
+00469  0A34  CD 12 D0              CMP VIC_RASTER_REGISTER
+00470  0A37  D0 FB                 BNE WAITLOOP
+00471  0A39             
+00472  0A39  60                    RTS
+00473  0A3A             
+00474  0A3A             
+00475  0A3A             ;===============================================================================
+00476  0A3A             ;PLAYER CONTROL
+00477  0A3A             
+00478  0A3A             PLAYERCONTROL 
+00479  0A3A             
+00480  0A3A  A9 02                 LDA DOWN                                ; GESTIONE DEL MOVIMENTO DOWN
+00481  0A3C  2C 00 DC              BIT JOY_PORT_A
+00482  0A3F  D0 15                 BNE NOTDOWNPRESSED
+00483  0A41             
+00484  0A41  AD 52 0B              LDA SPRITE_UP
+00485  0A44  8D F8 07              STA VIC_SPRITE_0_POINTER
+00486  0A47             
+00487  0A47  EE 52 0B              INC SPRITE_UP
+00488  0A4A  C9 87                 CMP #$87
+00489  0A4C  D0 05                 BNE NORESETSPRITEUP
+00490  0A4E  A9 86                 LDA #$86
+00491  0A50  8D 52 0B              STA SPRITE_UP
+00492  0A53                        
+00493  0A53             
+00494  0A53             NORESETSPRITEUP 
+00495  0A53             
+00496  0A53  20 C9 0A              JSR PLAYERMOVEDOWN
+00497  0A56             
+00498  0A56             NOTDOWNPRESSED 
+00499  0A56  A9 01                 LDA UP
+00500  0A58  2C 00 DC              BIT JOY_PORT_A
+00501  0A5B  D0 09                 BNE NOTUPPRESSED
+00502  0A5D             
+00503  0A5D  AD 53 0B              LDA SPRITE_DOWN
+00504  0A60  8D F8 07              STA VIC_SPRITE_0_POINTER
+00505  0A63             
+00506  0A63  20 DD 0A              JSR PLAYERMOVEUP
+00507  0A66             
+00508  0A66             NOTUPPRESSED 
+00509  0A66             
+00510  0A66  A9 04                 LDA LEFT                               ; GESTIONE DEL MOVIMENTO A SINISTRA DEL JOY
+00511  0A68  2C 00 DC              BIT JOY_PORT_A
+00512  0A6B  D0 2A                 BNE NOTLEFTPRESSED
+00513  0A6D                        
+00514  0A6D  AD 50 0B              LDA SPRITE_LEFT                         ; LEGGE IL BYTE CHE RAPPRESENTA LO
+00515  0A70  8D F8 07              STA VIC_SPRITE_0_POINTER                ; SPRITE DA VISULAIZZARE E LO MEMORIZZA
+00516  0A73                        ; NEL REGISTRO $07F8.
+00517  0A73             
+00518  0A73             
+00519  0A73                        ; ROUTINE PER ATTESA SU CAMBIO SPRITE
+00520  0A73  AD 54 0B              LDA SPRITE_DELAY
+00521  0A76  C9 03                 CMP #$03
+00522  0A78  F0 06                 BEQ NODELAYCHANGESPRITELEFT
+00523  0A7A  EE 54 0B              INC SPRITE_DELAY
+00524  0A7D  4C 94 0A              JMP NORESETSPRITELEFT
+00525  0A80             
+00526  0A80             NODELAYCHANGESPRITELEFT 
+00527  0A80  A9 00                 LDA #$0
+00528  0A82  8D 54 0B              STA SPRITE_DELAY
+00529  0A85             
+00530  0A85  EE 50 0B              INC SPRITE_LEFT                         ; INCREMENTA IL BYTE CHE RAPPRESENTA IL
+00531  0A88                        ; PROSSIMO SPRITE DA UTILIZZARE PER
+00532  0A88                        ; L'ASSE DELLE X.
+00533  0A88                        
+00534  0A88  AD 50 0B              LDA SPRITE_LEFT
+00535  0A8B  C9 85                 CMP #$85
+00536  0A8D  D0 05                 BNE NORESETSPRITELEFT
+00537  0A8F  A9 83                 LDA #$83
+00538  0A91  8D 50 0B              STA SPRITE_LEFT
+00539  0A94             
+00540  0A94             
+00541  0A94             NORESETSPRITELEFT 
+00542  0A94                        
+00543  0A94  20 EF 0A              JSR PLAYERMOVELEFT
+00544  0A97             
+00545  0A97             
+00546  0A97             
+00547  0A97             NOTLEFTPRESSED ; GESTIONE DEL MOVIMENTO A DESTRA DEL JOY
+00548  0A97  A9 08                 LDA RIGHT
+00549  0A99  2C 00 DC              BIT JOY_PORT_A
+00550  0A9C  D0 2A                 BNE NORIGHTPRESSED
+00551  0A9E                        
+00552  0A9E  AD 51 0B              LDA SPRITE_RIGHT
+00553  0AA1  8D F8 07              STA VIC_SPRITE_0_POINTER
+00554  0AA4             
+00555  0AA4             
+00556  0AA4                        ; ROUTINE PER ATTESA SU CAMBIO SPRITE
+00557  0AA4  AD 54 0B              LDA SPRITE_DELAY
+00558  0AA7  C9 03                 CMP #$03
+00559  0AA9  F0 06                 BEQ NODELAYCHANGESPRITERIGHT
+00560  0AAB  EE 54 0B              INC SPRITE_DELAY
+00561  0AAE  4C C5 0A              JMP NORESETSPRITERIGHT
+00562  0AB1             
+00563  0AB1             NODELAYCHANGESPRITERIGHT 
+00564  0AB1  A9 00                 LDA #$0
+00565  0AB3  8D 54 0B              STA SPRITE_DELAY
+00566  0AB6             
+00567  0AB6             
+00568  0AB6  EE 51 0B              INC SPRITE_RIGHT
+00569  0AB9  AD 51 0B              LDA SPRITE_RIGHT
+00570  0ABC  C9 82                 CMP #$82
+00571  0ABE  D0 05                 BNE NORESETSPRITERIGHT
+00572  0AC0  A9 80                 LDA #$80
+00573  0AC2  8D 51 0B              STA SPRITE_RIGHT
+00574  0AC5             
+00575  0AC5             NORESETSPRITERIGHT 
+00576  0AC5             
+00577  0AC5  20 11 0B              JSR PLAYERMOVERIGHT
+00578  0AC8             
+00579  0AC8             NORIGHTPRESSED 
+00580  0AC8             
+00581  0AC8  60                    RTS
+00582  0AC9             
+00583  0AC9             
+00584  0AC9             
+00585  0AC9             ;===============================================================================
+00586  0AC9             ;
+00587  0AC9             
+00588  0AC9             PLAYERMOVEDOWN 
+00589  0AC9             
+00590  0AC9  F0 11                 BEQ NOMOVEPLAYERDOWN
+00591  0ACB  EE 3F 0B              INC SPRITE_POS_Y                        ; INCREMENTA IL BYTE CHE RAPPRESENTA
+00592  0ACE                        ; LA POSIZIONE DELLO SPRITE
+00593  0ACE                        ; SULL'ASSE DELLE Y
+00594  0ACE  8A                    TXA
+00595  0ACF  0A                    ASL
+00596  0AD0  A8                    TAY
+00597  0AD1             
+00598  0AD1  AD 3F 0B              LDA SPRITE_POS_Y                        ; CARICA NELL'ACCUMULATORE IL BYTE
+00599  0AD4  8D 01 D0              STA VIC_SPRITE_POSY_REGISTER            ; CHE RAPPRESENTA LA POSIZIONE DELLO
+00600  0AD7                        ; SPRITE SULL'ASSE DELLE Y E
+00601  0AD7                        ; LO MEMRIZZA NEL REGISTRO $D000
+00602  0AD7                        ; DEL VIC
+00603  0AD7             
+00604  0AD7  A9 02                 LDA #2
+00605  0AD9  8D 55 0B              STA SPRITE_LAST_DIRECTION
+00606  0ADC                        
+00607  0ADC                        
+00608  0ADC                        
+00609  0ADC             NOMOVEPLAYERDOWN 
+00610  0ADC  60                    RTS
+00611  0ADD             
+00612  0ADD             PLAYERMOVEUP 
+00613  0ADD  CE 3F 0B              DEC SPRITE_POS_Y                        ; DECREMENTA IL BYTE CHE RAPPRESENTA
+00614  0AE0                        ; LA POSIZIONE DELLO SPRITE
+00615  0AE0                        ; SULL'ASSE DELLE Y
+00616  0AE0  8A                    TXA
+00617  0AE1  0A                    ASL
+00618  0AE2  A8                    TAY
+00619  0AE3             
+00620  0AE3  AD 3F 0B              LDA SPRITE_POS_Y                        ; CARICA NELL'ACCUMULATORE IL BYTE
+00621  0AE6  8D 01 D0              STA VIC_SPRITE_POSY_REGISTER            ; CHE RAPPRESENTA LA POSIZIONE DELLO
+00622  0AE9                        ; SPRITE SULL'ASSE DELLE Y E
+00623  0AE9                        ; LO MEMRIZZA NEL REGISTRO $D000
+00624  0AE9                        ; DEL VIC
+00625  0AE9             
+00626  0AE9  A9 01                 LDA #1
+00627  0AEB  8D 55 0B              STA SPRITE_LAST_DIRECTION
+00628  0AEE             
+00629  0AEE                        
+00630  0AEE  60                    RTS
+00631  0AEF             
+00632  0AEF             PLAYERMOVELEFT 
+00633  0AEF  DE 37 0B              DEC SPRITE_POS_X,X                      ; DECREMENTA IL BYTE CHE RAOORESENTA
+00634  0AF2                        ; LA POSIZIONE DELLO SPRITE SULL'
+00635  0AF2                        ; ASSE DELLE X.
+00636  0AF2  D0 0E                 BNE NOCHANGEINEXTENDEDFLAGLEFT
+00637  0AF4             
+00638  0AF4  BD 47 0B              LDA BIT_TABLE,X
+00639  0AF7  49 FF                 EOR #$FF
+00640  0AF9  2D 4F 0B              AND SPRITE_POS_X_EXTEND
+00641  0AFC  8D 4F 0B              STA SPRITE_POS_X_EXTEND
+00642  0AFF  8D 10 D0              STA VIC_SPRITE_POSX_EXTENDED_REGISTER
+00643  0B02             
+00644  0B02             NOCHANGEINEXTENDEDFLAGLEFT 
+00645  0B02  8A                    TXA
+00646  0B03  0A                    ASL
+00647  0B04  A8                    TAY
+00648  0B05  AD 37 0B              LDA SPRITE_POS_X                        ; CARICA NELL'ACCUMULATORE IL BYTE
+00649  0B08  99 00 D0              STA VIC_SPRITE_POSX_REGISTER,Y          ; CHE RAPPRESENTA LA POSIZIONE DELLO
+00650  0B0B                        ; SPRITE SULL'ASSE DELLE X E
+00651  0B0B                        ; LO MEMRIZZA NEL REGISTRO $D000
+00652  0B0B                        ; DEL VIC
+00653  0B0B             
+00654  0B0B  A9 03                 LDA #3
+00655  0B0D  8D 55 0B              STA SPRITE_LAST_DIRECTION
+00656  0B10             
+00657  0B10             
+00658  0B10             
+00659  0B10  60                    RTS
+00660  0B11             
+00661  0B11             
+00662  0B11             PLAYERMOVERIGHT 
+00663  0B11  EE 37 0B              INC SPRITE_POS_X                        ; INCREMENTA IL BYTE CHE RAPPRESENTA
+00664  0B14                        ; LA POSIZIONE DELLO SPRITE SULL'
+00665  0B14                        ; ASSE X.
+00666  0B14  AD 37 0B              LDA SPRITE_POS_X
+00667  0B17  D0 0C                 BNE NOCHANGEINEXTENDEDFLAGRIGHT
+00668  0B19             
+00669  0B19  BD 47 0B              LDA BIT_TABLE,X
+00670  0B1C  0D 4F 0B              ORA SPRITE_POS_X_EXTEND
+00671  0B1F  8D 4F 0B              STA SPRITE_POS_X_EXTEND
+00672  0B22  8D 10 D0              STA VIC_SPRITE_POSX_EXTENDED_REGISTER
+00673  0B25             
+00674  0B25             NOCHANGEINEXTENDEDFLAGRIGHT 
+00675  0B25  8A                    TXA
+00676  0B26  0A                    ASL
+00677  0B27  A8                    TAY
+00678  0B28  AD 37 0B              LDA SPRITE_POS_X                        ; CARICA NELL'ACCUMULATORE IL BYTE
+00679  0B2B  99 00 D0              STA VIC_SPRITE_POSX_REGISTER,Y          ; CHE RAPPRESENTA LA POSIZIONE DELLO
+00680  0B2E                        ; SPRITE SULL'ASSE DELLE X E
+00681  0B2E                        ; LO MEMRIZZA NEL REGISTRO $D000
+00682  0B2E                        ; DEL VIC
+00683  0B2E             
+00684  0B2E             
+00685  0B2E  A9 04                 LDA #4
+00686  0B30  8D 55 0B              STA SPRITE_LAST_DIRECTION
+00687  0B33             
+00688  0B33  60                    RTS
+00689  0B34             
+00690  0B34             
+00691  0B34             ;===============================================================================
+00692  0B34             
+00693  0B34             SCORE      ; PUNTEGGIO DI DEFAULT 0
+00694  0B34  30                    BYTE 48
+00695  0B35             
+00696  0B35             
+00697  0B35             REFRESH_BALLONS 
+00698  0B35  00                    BYTE 0
+00699  0B36             
+00700  0B36             TEMP
+00701  0B36  00                    BYTE 0
+00702  0B37             
+00703  0B37             SPRITE_POS_X 
+00704  0B37  1E 00 00              BYTE 30,0,0,0,0,0,0,0            ; POSIZIONE X DI PARTENZA DEGLI SPRITE
+00705  0B3F             
+00706  0B3F             SPRITE_POS_Y 
+00707  0B3F  96 00 00              BYTE 150,0,0,0,0,0,0,0            ; POSIZIONE X DI PARTENZA DEGLI SPRITE
+00708  0B47             
+00709  0B47             BIT_TABLE
+00710  0B47  01 02 04              BYTE 1,2,4,8,16,32,64,128
+00711  0B4F             
+00712  0B4F             SPRITE_POS_X_EXTEND 
+00713  0B4F  00                    BYTE 0
+00714  0B50             
+00715  0B50             SPRITE_LEFT 
+00716  0B50  83                    BYTE 131                        ; IL NUMERO È ESPRESSO IN DECIMALE
+00717  0B51             
+00718  0B51             SPRITE_RIGHT 
+00719  0B51  80                    BYTE 128                        ; IL NUMERO È ESPRESSO IN DECIMALE
+00720  0B52             
+00721  0B52             SPRITE_UP
+00722  0B52  86                    BYTE 134                        ; IL NUMERO È ESPRESSO IN DECIMALE
+00723  0B53             
+00724  0B53             SPRITE_DOWN 
+00725  0B53  88                    BYTE 136                        ; IL NUMERO È ESPRESSO IN DECIMALE
+00726  0B54             
+00727  0B54             SPRITE_DELAY 
+00728  0B54  00                    BYTE 0
+00729  0B55             
+00730  0B55             
+00731  0B55             SPRITE_LAST_DIRECTION ; 1 UP
+00732  0B55  00                    BYTE 0                          ; 2 DOWN
+00733  0B56                        ; 3 LEFT
+00734  0B56                        ; 4 RIGHT
+00735  0B56             
+00736  0B56             SPRITE2_BALLONS_POSX 
+00737  0B56  3C 78 5A              BYTE 60, 120, 90, 60, 200, 70, 130, 200, 240
+00738  0B5F             
+00739  0B5F             SPRITE2_BALLONS_POSY 
+00740  0B5F  82 9B AF              BYTE 130, 155, 175, 125 , 90, 200, 95, 100, 70
+00741  0B68             
+00742  0B68                        
+00743  0B68             
+00744  0B68             SPRITE3_BALLONS_POSX 
+00745  0B68  C8 46 82              BYTE 200, 70, 130, 200, 240, 60, 215, 90, 180
+00746  0B71             
+00747  0B71             SPRITE3_BALLONS_POSY 
+00748  0B71  C8 50 73              BYTE 200, 80, 115, 125 , 90, 110, 220, 100, 215
+00749  0B7A             
+00750  0B7A             
+00751  0B7A             SPRITE4_BALLONS_POSX 
+00752  0B7A  82 5F 6E              BYTE 130, 95, 110, 115, 155, 100, 90, 110, 60
+00753  0B83             
+00754  0B83             SPRITE4_BALLONS_POSY 
+00755  0B83  5A C8 50              BYTE 90, 200, 80, 215, 155, 90, 117, 175, 125
+00756  0B8C             
+00757  0B8C             SPRITENUMBERMASK 
+00758  0B8C  01 02 04              BYTE %00000001, %00000010, %00000100, %00001000, %00010000, %00100000, %01000000, %10000000
+00759  0B94             
+00760  0B94             
+00761  0B94  C9 CC 20   PUNTEGGIO  BYTE "IL TUO PUNTEGGIO ATTUALE:",0
+00762  0BAE             
+00763  0BAE             
+00764  0BAE             *          = $2000
+00765  2000             INCBIN     SPRITES.BIN
+00766  23C0             
+00767  23C0             
+00768  23C0             
+00769  23C0             
+
+******* 71 Label(s) *******
+Ballon = $08C5 
+BallonContinue = $08D1 
+BasePositionSprite = $0A10 
+BIT_TABLE = $0B47 
+CheckPlayerCollison = $0861 
+CheckSpriteCollideChar = $09B8 
+ClearScreen = $0A2E 
+CollisionWithChar = $09C0 
+continue = $084C 
+continueText = $0917 
+done = $091A 
+draw1 = $091D 
+draw2 = $096B 
+drawText = $0908 
+EnableMulticolor = $09EE 
+EnableSprite = $09FF 
+ExitCollide = $08C4 
+loop = $082C 
+loopEnableMulticolor = $09F0 
+loopEnableSprite = $0A01 
+loopText = $090A 
+MakeMap = $091B 
+NoChangeInExtendedFlagLeft = $0B02 
+NoChangeInExtendedFlagRight = $0B25 
+NoCollideSprite1_2 = $0882 
+NoCollideSprite3_1 = $0899 
+NoCollideSprite4_1 = $08B0 
+NoCollideSprite5_1 = $08C4 
+NoDelayChangeSpriteLeft = $0A80 
+NoDelayChangeSpriteRight = $0AB1 
+NoMovePlayerDown = $0ADC 
+NoResetScore = $085B 
+NoResetSpriteLeft = $0A94 
+NoResetSpriteRight = $0AC5 
+NoResetSpriteUp = $0A53 
+NoRightPressed = $0AC8 
+NotDownPressed = $0A56 
+NotLeftPressed = $0A97 
+NotUpPressed = $0A66 
+outchar = $0911 
+PlayerControl = $0A3A 
+PlayerMoveDown = $0AC9 
+PlayerMoveLeft = $0AEF 
+PlayerMoveRight = $0B11 
+PlayerMoveUp = $0ADD 
+punteggio = $0B94 
+REFRESH_BALLONS = $0B35 
+SCORE = $0B34 
+SetDefaultPositionSprite = $09DD 
+SetPlayingField = $09D7 
+SetPointerDataSprites = $09E8 
+SetupColorSprite0 = $0A1E 
+SPRITE_DELAY = $0B54 
+SPRITE_DOWN = $0B53 
+SPRITE_LAST_DIRECTION = $0B55 
+SPRITE_LEFT = $0B50 
+SPRITE_POS_X = $0B37 
+SPRITE_POS_X_EXTEND = $0B4F 
+SPRITE_POS_Y = $0B3F 
+SPRITE_RIGHT = $0B51 
+SPRITE_UP = $0B52 
+SPRITE2_BALLONS_POSX = $0B56 
+SPRITE2_BALLONS_POSY = $0B5F 
+SPRITE3_BALLONS_POSX = $0B68 
+SPRITE3_BALLONS_POSY = $0B71 
+SPRITE4_BALLONS_POSX = $0B7A 
+SPRITE4_BALLONS_POSY = $0B83 
+spriteNumberMask = $0B8C 
+TEMP = $0B36 
+waitLoop = $0A34 
+WaitRaster = $0A32 
+
+******* 13 Unused label(s) *******
+BasePositionSprite
+ClearScreen
+continueText
+drawText
+EnableMulticolor
+EnableSprite
+MakeMap
+outchar
+SetDefaultPositionSprite
+SetPlayingField
+SetPointerDataSprites
+SetupColorSprite0
+SPRITE4_BALLONS_POSX
+
+******* 34 Variable(s) *******
+BLACK  = $0000
+COLORMEM  = $D800
+DISABLE_ALL_SPRITE  = $0000
+DOWN  = $0002
+ENABLE_ALL_SPRITE  = $00FF
+GETIN  = $FFE4
+GREEN  = $0005
+JOY_PORT_A  = $DC00
+LEFT  = $0004
+LIGHT_GREEN  = $0013
+ORANGE  = $0012
+RIGHT  = $0008
+SCNKEY  = $FF9F
+SCREENMEM  = $0400
+SPSPCL  = $D01E
+tgt_c64  = $0001
+UP  = $0001
+VIC_BACKGROUND_REGISTER  = $D021
+VIC_BORDER_REGISTER  = $D020
+VIC_INTERRUPT_REGISTER  = $D01A
+VIC_RASTER_REGISTER  = $D012
+VIC_SPRITE_0_COLOR  = $D027
+VIC_SPRITE_0_POINTER  = $07F8
+VIC_SPRITE_1_COLOR  = $D028
+VIC_SPRITE_COLLISION_FOREGROUND  = $D01F
+VIC_SPRITE_ENABLE_MULTICOLOR  = $D01C
+VIC_SPRITE_ENABLE_REGISTER  = $D015
+VIC_SPRITE_MULTICOLOR_0  = $D025
+VIC_SPRITE_MULTICOLOR_1  = $D026
+VIC_SPRITE_POSX_EXTENDED_REGISTER  = $D010
+VIC_SPRITE_POSX_REGISTER  = $D000
+VIC_SPRITE_POSY_REGISTER  = $D001
+WHITE  = $0001
+YELLOW  = $0007
+******* 14 Unused variables(s) *******
+COLORMEM
+DISABLE_ALL_SPRITE
+ENABLE_ALL_SPRITE
+GETIN
+GREEN
+LIGHT_GREEN
+SCNKEY
+SCREENMEM
+SPSPCL
+tgt_c64
+VIC_BACKGROUND_REGISTER
+VIC_INTERRUPT_REGISTER
+VIC_SPRITE_1_COLOR
+YELLOW
+
